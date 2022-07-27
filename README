@@ -1,7 +1,7 @@
 '''
 Python DISCORD\Telegram bot for stream announcement
 
-Twitch API for check ONLINE stream, and DISCORD api for messeging in a channel
+Twitch API for check stream ONLINE or NOT, and DISCORD api for messaging in a channel
 
 
 Memmory TEST:
