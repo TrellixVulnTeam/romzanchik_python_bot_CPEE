@@ -4,32 +4,44 @@ import os
 from dotenv import load_dotenv
 import asyncio
 from discord.ext import commands
+import dill
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
 bot = commands.Bot(command_prefix='!')
 date = ''
-flag = False
-
+try:
+    with open('cache/cached_data.pkl', 'rb') as f:
+        cache_data = dill.load(f)
+except Exception as e:
+    cache_data = []
+    print(f'Dill load failed: {e}')
+print(cache_data)
+tasks = {}
 
 @bot.event
 async def on_ready():
-    print(f'{bot.user.name} has connected to Discord!')
-
-
-@bot.command(name='FollowTwitch')
-async def FollowTwitch(ctx, streamer):
-    global flag
-    await ctx.channel.send(f'Начато отслеживание канала: {streamer}')
-    flag = False
-    print(f'Начато отслеживание канала: {streamer}')
-    global date
+    global tasks
+    global cache_data
+    print(f'{bot.user.name} has connected to Discord and ready for work!')
+    
     try:
-        loop_streamer = asyncio.get_event_loop()
-        #print(f'loop: {loop_streamer},\ntask: {task_stream}')
-        while flag == False:
-            task_stream = await loop_streamer.create_task(get_stream_data(streamer))
+        if cache_data:
+            for i in cache_data:
+                channel = bot.get_channel(i[0])
+                tw_name = i[1]
+                tasks[tw_name + str(i[0])] = asyncio.create_task(track_stream_and_send_message(channel, tw_name))
+                await channel.send(f'Возобновлена работа по отслеживанию канала: {tw_name}')
+    except Exception as e:
+        print(f'Send failed: {e}')
+
+async def track_stream_and_send_message(ctx, streamer):
+    global date
+
+    try:
+        while True:
+            task_stream = await get_stream_data(streamer)
             if task_stream and task_stream['Online'] and date != task_stream['StartTime']:
                 game = task_stream['GameName']
                 title = task_stream['StreamTitle']
@@ -43,11 +55,39 @@ async def FollowTwitch(ctx, streamer):
         print("Error: ", exc)
 
 
-@bot.command(name='StopFollowingTwitch')
-async def StopFollowingTwitch(ctx):
-    global flag
-    flag = True
-    await ctx.channel.send(f'Останавлено отслеживание канала')
-    print(f'Останавлено отслеживание канала')
+@bot.command(name='FollowTwitch', help='Отслеживание онлайна twitch канала.')
+async def FollowTwitch(ctx, tw_name):
+    global cache_data
+    global tasks
+    if (ctx.channel.id, tw_name) not in cache_data:
+        cache_data.append((ctx.channel.id, tw_name))
+        try:
+            with open('cache/cached_data.pkl', 'wb') as f:
+                dill.dump(cache_data, f)
+        except Exception as e:
+            print(f'Dill dump failed: {e}')
+
+        tasks[tw_name + str(ctx.channel.id)] = asyncio.create_task(track_stream_and_send_message(ctx.channel.id, tw_name))
+        await ctx.channel.send(f'Начато отслеживание канала: {tw_name}')
+        print(f'Начато отслеживание канала: {tw_name}')
+    else:
+        await ctx.channel.send(f'{tw_name} уже отслеживается в данном канале!')
     
+
+
+@bot.command(name='StopFollowTwitch', help='Остановить отслеживание онлайна twitch канала.')
+async def StopFollowTwitch(ctx, tw_name):
+    global tasks
+    global cache_data
+    tasks[tw_name + str(ctx.channel.id)].cancel()
+
+    try:
+        del cache_data[cache_data.index((ctx.channel.id, tw_name))]
+        with open('cache/cached_data.pkl', 'wb') as f:
+            dill.dump(cache_data, f)
+    except Exception as e:
+        print(f'Update dump failed: {e}')
+    
+
+
 bot.run(TOKEN)
