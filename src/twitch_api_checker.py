@@ -1,5 +1,7 @@
 # %%
 import asyncio
+from datetime import datetime
+from dateutil import tz
 
 async def get_stream_data(ChannelName: str):
    '''
@@ -26,7 +28,14 @@ async def get_stream_data(ChannelName: str):
       if 'data' in response:
          if response['data'] != [] and response['data'][0]['type'] == 'live':
             data = response['data'][0]
-            return {'Online': True, 'UserName': ChannelName, 'GameName': data['game_name'], 'StreamTitle': data['title'], 'StartTime': data['started_at']}
+            start_time = data['started_at']
+            from_zone = tz.gettz('UTC')
+            to_zone = tz.gettz('Europe/Moscow')
+            utc = datetime.strptime(start_time, '%Y-%m-%dT%H:%M:%SZ')
+            utc = utc.replace(tzinfo=from_zone)
+            msk = utc.astimezone(to_zone)
+
+            return {'Online': True, 'UserName': ChannelName, 'GameName': data['game_name'], 'StreamTitle': data['title'], 'StartTime': msk.ctime()}
    except Exception as e:
       print("Error checking user: ", e)
    return False

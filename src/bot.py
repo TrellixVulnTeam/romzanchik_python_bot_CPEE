@@ -89,8 +89,5 @@ async def StopFollowTwitch(ctx, tw_name):
         await ctx.channel.send(f'Остановлено отслеживание канала : {tw_name}')
     except Exception as e:
         print(f'Update dump failed: {e}')
-    
-
-
 
 bot.run(TOKEN)
