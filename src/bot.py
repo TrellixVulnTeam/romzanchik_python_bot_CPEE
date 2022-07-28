@@ -38,7 +38,7 @@ async def on_ready():
 
 async def track_stream_and_send_message(ctx, streamer):
     global date
-
+    
     try:
         while True:
             task_stream = await get_stream_data(streamer)
@@ -48,7 +48,7 @@ async def track_stream_and_send_message(ctx, streamer):
                 start_date = task_stream['StartTime']
                 date = start_date
                 print(f'{streamer} запустил(а) трансляцию: "{title}".\nИграем в {game}.\nВремя начала стрима: {start_date}.\nСсылка на трансляцию: https://www.twitch.tv/{streamer}')
-                await ctx.channel.send(f'_ @everyone @here {title}.\nИграем в {game}.\nВремя начала стрима: {start_date}.\nСсылка на трансляцию:_ https://www.twitch.tv/{streamer}')
+                await ctx.send(f'_ @everyone @here {title}.\nИграем в {game}.\nВремя начала стрима: {start_date}.\nСсылка на трансляцию:_ https://www.twitch.tv/{streamer}')
             else:
                 await asyncio.sleep(15)
     except Exception as exc:
@@ -67,7 +67,8 @@ async def FollowTwitch(ctx, tw_name):
         except Exception as e:
             print(f'Dill dump failed: {e}')
 
-        tasks[tw_name + str(ctx.channel.id)] = asyncio.create_task(track_stream_and_send_message(ctx.channel.id, tw_name))
+        channel = bot.get_channel(ctx.channel.id)
+        tasks[tw_name + str(ctx.channel.id)] = asyncio.create_task(track_stream_and_send_message(channel, tw_name))
         await ctx.channel.send(f'Начато отслеживание канала: {tw_name}')
         print(f'Начато отслеживание канала: {tw_name}')
     else:
@@ -85,9 +86,11 @@ async def StopFollowTwitch(ctx, tw_name):
         del cache_data[cache_data.index((ctx.channel.id, tw_name))]
         with open('cache/cached_data.pkl', 'wb') as f:
             dill.dump(cache_data, f)
+        await ctx.channel.send(f'Остановлено отслеживание канала : {tw_name}')
     except Exception as e:
         print(f'Update dump failed: {e}')
     
+
 
 
 bot.run(TOKEN)
