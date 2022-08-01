@@ -10,7 +10,7 @@ load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
 bot = commands.Bot(command_prefix='!')
-date = ''
+date = {}
 try:
     with open('cache/cached_data.pkl', 'rb') as f:
         cache_data = dill.load(f)
@@ -42,12 +42,12 @@ async def track_stream_and_send_message(ctx, streamer):
     try:
         while True:
             task_stream = await get_stream_data(streamer)
-            if task_stream and task_stream['Online'] and date != task_stream['StartTime']:
+            if task_stream and task_stream['Online'] and date.get(streamer, '') != task_stream['StartTime']:
                 game = task_stream['GameName']
                 title = task_stream['StreamTitle']
                 start_date = task_stream['StartTime']
-                date = start_date
-                print(f'{streamer} запустил(а) трансляцию: "{title}".\nИграем в {game}.\nВремя начала стрима: {start_date}.\nСсылка на трансляцию: https://www.twitch.tv/{streamer}')
+                date[streamer] = start_date
+                #print(f'{streamer} запустил(а) трансляцию: "{title}".\nИграем в {game}.\nВремя начала стрима: {start_date}.\nСсылка на трансляцию: https://www.twitch.tv/{streamer}')
                 await ctx.send(f'_ @everyone @here {title}.\nИграем в {game}.\nВремя начала стрима: {start_date}.\nСсылка на трансляцию:_ https://www.twitch.tv/{streamer}')
             else:
                 await asyncio.sleep(15)
@@ -55,8 +55,8 @@ async def track_stream_and_send_message(ctx, streamer):
         print("Error: ", exc)
 
 
-@bot.command(name='FollowTwitch', help='Отслеживание онлайна twitch канала.')
-async def FollowTwitch(ctx, tw_name):
+@bot.command(name='TrackStreamer', aliases=['TS', 'FollowTwitch', 'TrackOnline', 'TO'], help='Отслеживание онлайна twitch канала.')
+async def TrackStreamer(ctx, tw_name):
     global cache_data
     global tasks
     if (ctx.channel.id, tw_name) not in cache_data:
@@ -70,14 +70,12 @@ async def FollowTwitch(ctx, tw_name):
         channel = bot.get_channel(ctx.channel.id)
         tasks[tw_name + str(ctx.channel.id)] = asyncio.create_task(track_stream_and_send_message(channel, tw_name))
         await ctx.channel.send(f'Начато отслеживание канала: {tw_name}')
-        print(f'Начато отслеживание канала: {tw_name}')
+        #print(f'Начато отслеживание канала: {tw_name}')
     else:
         await ctx.channel.send(f'{tw_name} уже отслеживается в данном канале!')
     
-
-
-@bot.command(name='StopFollowTwitch', help='Остановить отслеживание онлайна twitch канала.')
-async def StopFollowTwitch(ctx, tw_name):
+@bot.command(name='StopTracking', aliases=['ST', 'StopFollowTwitch'], help='Остановить отслеживание онлайна twitch канала.')
+async def StopTracking(ctx, tw_name):
     global tasks
     global cache_data
     tasks[tw_name + str(ctx.channel.id)].cancel()
@@ -86,8 +84,20 @@ async def StopFollowTwitch(ctx, tw_name):
         del cache_data[cache_data.index((ctx.channel.id, tw_name))]
         with open('cache/cached_data.pkl', 'wb') as f:
             dill.dump(cache_data, f)
+
+        tasks.pop(tw_name + str(ctx.channel.id))
         await ctx.channel.send(f'Остановлено отслеживание канала : {tw_name}')
     except Exception as e:
         print(f'Update dump failed: {e}')
+
+@bot.command(name='ShowFollowedChannels', aliases=['SFC', 'DisplayTrackList', 'DTL'], help='Показать отслеживаемые каналы в данном чате.')
+async def ShowFollowedChannels(ctx):
+    global tasks
+    for key in tasks.keys():
+        if key.endswith(f'{ctx.channel.id}'):
+            channel = key.replace(f'{ctx.channel.id}', '')
+            await ctx.channel.send(f'Отслеживаемый канал в данном чате: {channel}')
+    
+    
 
 bot.run(TOKEN)
